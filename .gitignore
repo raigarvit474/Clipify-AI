@@ -1,0 +1,11 @@
+# Ignore the ASD folder inside clipify-ai-backend
+clipify-ai-backend/asd/
+
+# Ignore the .venv folder inside clipify-ai-backend
+clipify-ai-backend/.venv/
+
+# Ignore specific files inside clipify-ai-backend
+clipify-ai-backend/mi6.mp4
+clipify-ai-backend/mi65min.mp4
+clipify-ai-backend/mi630min.mp4
+clipify-ai-backend/therapy.mp4

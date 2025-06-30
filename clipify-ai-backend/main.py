@@ -21,8 +21,10 @@ import pysubs2
 from tqdm import tqdm
 import whisperx
 
+
 class ProcessVideoRequest(BaseModel):
-    s3_key:str
+    s3_key: str
+
 
 image = (modal.Image.from_registry(
     "nvidia/cuda:12.4.0-devel-ubuntu22.04", add_python="3.12")
@@ -41,7 +43,8 @@ volume = modal.Volume.from_name(
 
 mount_path = "/root/.cache/torch"
 
-auth_scheme=HTTPBearer()
+auth_scheme = HTTPBearer()
+
 
 def create_vertical_video(tracks, scores, pyframes_path, pyavi_path, audio_path, output_path, framerate=25):
     target_width = 1080
@@ -144,6 +147,93 @@ def create_vertical_video(tracks, scores, pyframes_path, pyavi_path, audio_path,
     subprocess.run(ffmpeg_command, shell=True, check=True, text=True)
 
 
+def create_subtitles_with_ffmpeg(transcript_segments: list, clip_start: float, clip_end: float, clip_video_path: str, output_path: str, max_words: int = 5):
+    temp_dir = os.path.dirname(output_path)
+    subtitle_path = os.path.join(temp_dir, "temp_subtitles.ass")
+
+    clip_segments = [segment for segment in transcript_segments
+                     if segment.get("start") is not None
+                     and segment.get("end") is not None
+                     and segment.get("end") > clip_start
+                     and segment.get("start") < clip_end
+                     ]
+
+    subtitles = []
+    current_words = []
+    current_start = None
+    current_end = None
+
+    for segment in clip_segments:
+        word = segment.get("word", "").strip()
+        seg_start = segment.get("start")
+        seg_end = segment.get("end")
+
+        if not word or seg_start is None or seg_end is None:
+            continue
+
+        start_rel = max(0.0, seg_start - clip_start)
+        end_rel = max(0.0, seg_end - clip_start)
+
+        if end_rel <= 0:
+            continue
+
+        if not current_words:
+            current_start = start_rel
+            current_end = end_rel
+            current_words = [word]
+        elif len(current_words) >= max_words:
+            subtitles.append(
+                (current_start, current_end, ' '.join(current_words)))
+            current_words = [word]
+            current_start = start_rel
+            current_end = end_rel
+        else:
+            current_words.append(word)
+            current_end = end_rel
+
+    if current_words:
+        subtitles.append(
+            (current_start, current_end, ' '.join(current_words)))
+
+    subs = pysubs2.SSAFile()
+
+    subs.info["WrapStyle"] = 0
+    subs.info["ScaledBorderAndShadow"] = "yes"
+    subs.info["PlayResX"] = 1080
+    subs.info["PlayResY"] = 1920
+    subs.info["ScriptType"] = "v4.00+"
+
+    style_name = "Default"
+    new_style = pysubs2.SSAStyle()
+    new_style.fontname = "Anton"
+    new_style.fontsize = 140
+    new_style.primarycolor = pysubs2.Color(255, 255, 255)
+    new_style.outline = 2.0
+    new_style.shadow = 2.0
+    new_style.shadowcolor = pysubs2.Color(0, 0, 0, 128)
+    new_style.alignment = 2
+    new_style.marginl = 50
+    new_style.marginr = 50
+    new_style.marginv = 50
+    new_style.spacing = 0.0
+
+    subs.styles[style_name] = new_style
+
+    for i, (start, end, text) in enumerate(subtitles):
+        start_time = pysubs2.make_time(s=start)
+        end_time = pysubs2.make_time(s=end)
+        line = pysubs2.SSAEvent(
+            start=start_time, end=end_time, text=text, style=style_name)
+        subs.events.append(line)
+
+    subs.save(subtitle_path)
+
+    ffmpeg_cmd = (f"ffmpeg -y -i {clip_video_path} -vf \"ass={subtitle_path}\" "
+                  f"-c:v h264 -preset fast -crf 23 {output_path}")
+
+    subprocess.run(ffmpeg_cmd, shell=True, check=True)
+
+
 def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_time: float, end_time: float, clip_index: int, transcript_segments: list):
     clip_name = f"clip_{clip_index}"
     s3_key_dir = os.path.dirname(s3_key)
@@ -206,10 +296,13 @@ def process_clip(base_dir: str, original_video_path: str, s3_key: str, start_tim
     print(
         f"Clip {clip_index} vertical video creation time: {cvv_end_time - cvv_start_time:.2f} seconds")
 
-    
+    create_subtitles_with_ffmpeg(transcript_segments, start_time,
+                                 end_time, vertical_mp4_path, subtitle_output_path, max_words=5)
+
     s3_client = boto3.client("s3")
     s3_client.upload_file(
-        vertical_mp4_path, "clipify-ai", output_s3_key)
+        subtitle_output_path, "ai-podcast-clipper-b", output_s3_key)
+
 
 @app.cls(gpu="L40S", timeout=900, retries=0, scaledown_window=20, secrets=[modal.Secret.from_name("ai-podcast-clipper-secret")], volumes={mount_path: volume})
 class AiPodcastClipper:
@@ -227,12 +320,9 @@ class AiPodcastClipper:
 
         print("Transcription models loaded...")
 
-
         print("Creating gemini client...")
         self.gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         print("Created gemini client...")
-
-
 
     def transcribe_video(self, base_dir: str, video_path: str) -> str:
         audio_path = base_dir / "audio.wav"
@@ -269,7 +359,7 @@ class AiPodcastClipper:
                 })
 
         return json.dumps(segments)
-    
+
     def identify_moments(self, transcript: dict):
         response = self.gemini_client.models.generate_content(model="gemini-2.5-flash-preview-04-17", contents="""
     This is a podcast video transcript consisting of word, along with each words's start and end time. I am looking to create clips between a minimum of 30 and maximum of 60 seconds long. The clip should never exceed 60 seconds.
@@ -296,23 +386,24 @@ class AiPodcastClipper:
         return response.text
 
     @modal.fastapi_endpoint(method="POST")
-    def process_video(self,request:ProcessVideoRequest,token:HTTPAuthorizationCredentials=Depends(auth_scheme)):
-        s3_key=request.s3_key
+    def process_video(self, request: ProcessVideoRequest, token: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+        s3_key = request.s3_key
 
-        if(token.credentials != os.environ["AUTH_TOKEN"]):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect Bearer Token",headers={"WWW-Authenticate": "Bearer"})
-        
-        run_id=str(uuid.uuid4())
+        if token.credentials != os.environ["AUTH_TOKEN"]:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Incorrect bearer token", headers={"WWW-Authenticate": "Bearer"})
+
+        run_id = str(uuid.uuid4())
         base_dir = pathlib.Path("/tmp") / run_id
         base_dir.mkdir(parents=True, exist_ok=True)
 
         # Download video file
         video_path = base_dir / "input.mp4"
         s3_client = boto3.client("s3")
-        s3_client.download_file("clipify-ai", s3_key, str(video_path))
+        s3_client.download_file("ai-podcast-clipper-b", s3_key, str(video_path))
 
-        #1. Transcription
-        transcript_segments_json=self.transcribe_video(base_dir,video_path)
+        # 1. Transcription
+        transcript_segments_json = self.transcribe_video(base_dir, video_path)
         transcript_segments = json.loads(transcript_segments_json)
 
         # 2. Identify moments for clips
@@ -333,7 +424,7 @@ class AiPodcastClipper:
         print(clip_moments)
 
         # 3. Process clips
-        for index, moment in enumerate(clip_moments[:1]): 
+        for index, moment in enumerate(clip_moments[:5]):
             if "start" in moment and "end" in moment:
                 print("Processing clip" + str(index) + " from " +
                       str(moment["start"]) + " to " + str(moment["end"]))
@@ -344,28 +435,26 @@ class AiPodcastClipper:
             print(f"Cleaning up temp dir after {base_dir}")
             shutil.rmtree(base_dir, ignore_errors=True)
 
+
 @app.local_entrypoint()
 def main():
     import requests
 
     ai_podcast_clipper = AiPodcastClipper()
 
-    url=ai_podcast_clipper.process_video.web_url
+    url = ai_podcast_clipper.process_video.web_url
 
-    payload={
-        "s3_key":"test1/mi65min.mp4"
+    payload = {
+        "s3_key": "test1/mi65min.mp4"
     }
 
-    headers={
+    headers = {
         "Content-Type": "application/json",
-        "Authorization":"Bearer 123123"
+        "Authorization": "Bearer 123123"
     }
 
-    response=requests.post(url, json=payload, headers=headers)
-
+    response = requests.post(url, json=payload,
+                             headers=headers)
     response.raise_for_status()
-    result=response.json()
+    result = response.json()
     print(result)
-    
-        
-

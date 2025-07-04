@@ -107,7 +107,7 @@ export function DashboardClient({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Podcast Clipper
+            PodClipper
           </h1>
           <p className="text-muted-foreground">
             Upload your podcast and get AI-generated clips instantly

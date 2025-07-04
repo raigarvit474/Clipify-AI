@@ -55,6 +55,7 @@ export function LoginForm({
         setError("Invalid email or password.");
       } else {
         router.push("/dashboard");
+        router.refresh();
       }
     } catch (error) {
       setError("An unexpected error occured");

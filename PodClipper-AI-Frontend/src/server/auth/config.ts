@@ -1,9 +1,16 @@
+import GoogleProvider from "next-auth/providers/google";
+import { env } from "~/env";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { comparePasswords } from "~/lib/auth";
 
 import { db } from "~/server/db";
+import Stripe from "stripe";
+
+const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-06-30.basil",
+});
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -15,15 +22,12 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
     } & DefaultSession["user"];
   }
 
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
+  interface User {
+    stripeCustomerId?: string; // 👈 Add this line
+  }
 }
 
 /**
@@ -54,12 +58,22 @@ export const authConfig = {
         if (!user) {
           return null;
         }
+        if (!user?.password) {
+          return null;
+        }
 
         const passwordMatch = await comparePasswords(password, user.password);
         if (!passwordMatch) return null;
 
-        return user;
+        return {
+          ...user,
+          stripeCustomerId: user.stripeCustomerId ?? undefined,
+        };
       },
+    }),
+    GoogleProvider({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
     }),
   ],
   session: { strategy: "jwt" },
@@ -77,6 +91,21 @@ export const authConfig = {
         token.id = user.id;
       }
       return token;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Skip if already has a stripe customer ID
+      if (user.stripeCustomerId) return;
+
+      const customer = await stripe.customers.create({
+        email: user.email ?? undefined,
+      });
+
+      await db.user.update({
+        where: { id: user.id },
+        data: { stripeCustomerId: customer.id },
+      });
     },
   },
 } satisfies NextAuthConfig;

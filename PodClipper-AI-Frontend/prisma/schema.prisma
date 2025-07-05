@@ -59,7 +59,7 @@ model User {
     name          String?
     email         String   @unique
     emailVerified DateTime?
-    password      String
+    password      String?
     credits       Int @default(10)
     stripeCustomerId String? @unique
     image         String?

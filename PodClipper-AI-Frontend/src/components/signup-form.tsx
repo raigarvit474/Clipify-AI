@@ -20,6 +20,7 @@ import { signupSchema, type SignupFormValues } from "~/schemas/auth";
 import { signUp } from "~/actions/auth";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { GoogleAuthButton } from "./google-auth-button";
 
 export function SignupForm({
   className,
@@ -76,8 +77,27 @@ export function SignupForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <GoogleAuthButton text="Sign up with Google" />
+          <div className="my-4 flex items-center justify-center">
+            <div className="border-t border-gray-300 w-full" />
+            <span className="mx-4 text-sm text-gray-500">or</span>
+            <div className="border-t border-gray-300 w-full" />
+          </div>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  required
+                  {...register("name")}
+                />
+                {errors.name && (
+                  <p className="text-sm text-red-500">{errors.name.message}</p>
+                )}
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -98,6 +118,7 @@ export function SignupForm({
                 <Input
                   id="password"
                   type="password"
+                  placeholder="Your password"
                   required
                   {...register("password")}
                 />

@@ -1,5 +1,5 @@
 "use client";
-
+import { GoogleAuthButton } from "~/components/google-auth-button";
 import { cn } from "~/lib/utils";
 import {
   Card,
@@ -74,6 +74,12 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <GoogleAuthButton text="Sign in with Google" />
+          <div className="my-4 flex items-center justify-center">
+            <div className="border-t border-gray-300 w-full" />
+            <span className="mx-4 text-sm text-gray-500">or</span>
+            <div className="border-t border-gray-300 w-full" />
+          </div>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
@@ -96,6 +102,7 @@ export function LoginForm({
                 <Input
                   id="password"
                   type="password"
+                  placeholder="Your password"
                   required
                   {...register("password")}
                 />
@@ -111,7 +118,6 @@ export function LoginForm({
                   {error}
                 </p>
               )}
-
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Logging in..." : "Log in"}
               </Button>

@@ -20,7 +20,7 @@ export async function signUp(data: SignupFormValues): Promise<SignupResult> {
     };
   }
 
-  const { email, password } = validationResult.data;
+  const {name, email, password } = validationResult.data;
 
   try {
     const existingUser = await db.user.findUnique({ where: { email } });
@@ -28,7 +28,9 @@ export async function signUp(data: SignupFormValues): Promise<SignupResult> {
     if (existingUser) {
       return {
         success: false,
-        error: "Email already in use",
+        error: existingUser.password
+          ? "Email already in use"
+          : "Email already registered via Google. Please sign in with Google.",
       };
     }
 
@@ -42,6 +44,7 @@ export async function signUp(data: SignupFormValues): Promise<SignupResult> {
 
     await db.user.create({
       data: {
+        name,
         email,
         password: hashedPassword,
         stripeCustomerId: stripeCustomer.id,

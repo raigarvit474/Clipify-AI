@@ -30,7 +30,7 @@ interface PricingPlan {
 const plans: PricingPlan[] = [
   {
     title: "Small Pack",
-    price: "$9.99",
+    price: "₹999",
     description: "Perfect for occasional podcast creators",
     features: ["50 credits", "No expiration", "Download all clips"],
     buttonText: "Buy 50 credits",
@@ -39,7 +39,7 @@ const plans: PricingPlan[] = [
   },
   {
     title: "Medium Pack",
-    price: "$24.99",
+    price: "₹2,499",
     description: "Best value for regular podcasters",
     features: ["150 credits", "No expiration", "Download all clips"],
     buttonText: "Buy 150 credits",
@@ -50,7 +50,7 @@ const plans: PricingPlan[] = [
   },
   {
     title: "Large Pack",
-    price: "$69.99",
+    price: "₹5,999",
     description: "Ideal for podcast studioes and agencies",
     features: ["500 credits", "No expiration", "Download all clips"],
     buttonText: "Buy 500 credits",

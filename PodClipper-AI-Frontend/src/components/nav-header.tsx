@@ -22,9 +22,7 @@ const NavHeader = ({ credits, email }: { credits: number; email: string }) => {
       <div className="container flex h-16 items-center justify-between px-4 py-2">
         <Link href="/dashboard" className="flex items-center">
           <div className="font-sans text-xl font-medium tracking-tight">
-            <span className="text-foreground">podcast</span>
-            <span className="font-light text-gray-500">/</span>
-            <span className="text-foreground font-light">clipper</span>
+            <span className="text-foreground">PodClipper</span>
           </div>
         </Link>
 
@@ -53,7 +51,7 @@ const NavHeader = ({ credits, email }: { credits: number; email: string }) => {
                 className="relative h-8 w-8 rounded-full p-0"
               >
                 <Avatar>
-                  <AvatarFallback>{email.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{email.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>

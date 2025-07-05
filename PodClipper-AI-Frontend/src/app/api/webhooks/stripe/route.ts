@@ -1,9 +1,12 @@
 // stripe listen --forward-to localhost:3000/api/webhooks/stripe
 
+import { PurchaseConfirmationEmail } from "~/components/purchase-confirmation-email";
+
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { env } from "~/env";
 import { db } from "~/server/db";
+import { sendEmail } from "~/actions/email";
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-06-30.basil",
@@ -59,6 +62,20 @@ export async function POST(req: Request) {
               },
             },
           });
+
+          // Retrieve customer email
+          const user = await db.user.findUnique({
+            where: { stripeCustomerId: customerId },
+            select: { email: true },
+          });
+          
+          if (user?.email) {
+            await sendEmail({
+              to: user.email,
+              subject: "Thanks for your purchase 🎉 - PodClipper",
+              html: PurchaseConfirmationEmail({ credits: creditsToAdd }),
+            });
+          }
         }
       }
     }

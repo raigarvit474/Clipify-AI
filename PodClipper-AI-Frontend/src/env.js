@@ -28,7 +28,10 @@ export const env = createEnv({
     BASE_URL: z.string(),
     STRIPE_WEBHOOK_SECRET: z.string(),
     GOOGLE_CLIENT_ID: z.string(),
-  GOOGLE_CLIENT_SECRET: z.string(),
+    GOOGLE_CLIENT_SECRET: z.string(),
+    EMAIL_USER: z.string().email(),
+    EMAIL_PASS: z.string(),
+    EMAIL_FROM_USER: z.string(),
   },
 
   /**
@@ -65,6 +68,9 @@ export const env = createEnv({
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    EMAIL_USER: process.env.EMAIL_USER,
+    EMAIL_PASS: process.env.EMAIL_PASS,
+    EMAIL_FROM_USER: process.env.EMAIL_FROM_USER,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

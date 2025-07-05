@@ -2,6 +2,8 @@ import { env } from "~/env";
 import { inngest } from "./client";
 import { db } from "~/server/db";
 import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import { sendEmail } from "~/actions/email";
+import { ProcessingCompleteEmail } from "~/components/processing-complete-email";
 
 export const processVideo = inngest.createFunction(
   {
@@ -116,6 +118,31 @@ export const processVideo = inngest.createFunction(
             },
           });
         });
+        await step.run("send-completion-email", async () => {
+          const uploadedFile = await db.uploadedFile.findUniqueOrThrow({
+            where: {
+              id: uploadedFileId,
+            },
+            select: {
+              user: {
+                select: {
+                  email: true,
+                },
+              },
+            },
+          });
+        
+          if (uploadedFile.user.email) {
+            await sendEmail({
+              to: uploadedFile.user.email,
+              subject: "🎬 Your PodClipper video is ready!",
+              html: ProcessingCompleteEmail({
+                clipsFound,
+              }),
+            });
+          }
+        });
+        
       } else {
         await step.run("set-status-no-credits", async () => {
           await db.uploadedFile.update({

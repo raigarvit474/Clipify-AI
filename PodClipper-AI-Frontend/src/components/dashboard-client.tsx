@@ -89,7 +89,7 @@ export function DashboardClient({
 
       toast.success("Video uploaded successfully", {
         description:
-          "Your video has been scheduled for processing. Check the status below.",
+          "Your video has been scheduled for processing. Check the status below. This may take upto 10 mins Minutes. You can come back later if you like.",
         duration: 5000,
       });
     } catch (error) {

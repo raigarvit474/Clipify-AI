@@ -1,0 +1,10 @@
+# Ignore the .venv folder inside clipify-ai-backend
+.venv/
+
+# Ignore specific files inside clipify-ai-backend
+mi6.mp4
+mi65min.mp4
+mi630min.mp4
+therapy.mp4
+
+__pycache__/
